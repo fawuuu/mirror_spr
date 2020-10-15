@@ -109,3 +109,64 @@ hwf = function(A, y, ini, step = 0.1, beta = 1e-6, iteration = 100, iterates = T
   
   return(X)
 }
+
+# Define Mirror descent (EG formulation)
+# A: measurement matrix
+# y: vector of observations
+# ini: index for initialization (i_max)
+# step: step size
+# beta: mirror map parameter
+# iteration: maximum number of iterations
+# iterates: TRUE/FALSE, whether to save all iterates (relevant for large n)
+# x_star: if iterates=FALSE, compute L2 error and Bregman divergence in each iteration
+mirror_eg = function(A, y, ini, step = 0.4, beta = 1e-10, iteration = 100, iterates = TRUE, x_star = 0){
+  m = nrow(A)
+  n = ncol(A)
+  
+  # Create matrix to save iterates if iterates=TRUE
+  if(iterates == TRUE){
+    X = matrix(0, nrow = iteration, ncol = n)
+  }else{ # Else, create matrix to save L2 errors and Bregman divergences
+    X = matrix(0, nrow = iteration, ncol = 2)
+  }  
+  
+  # Initialization 
+  # Estimate the signal size
+  size_est = sqrt(mean(y))
+  
+  # Initialize U and V
+  u_cur = rep(beta/2, n)
+  v_cur = rep(beta/2, n)
+  
+  u_cur[ini] = size_est / (2 * sqrt(3)) + sqrt(size_est^2/12 + beta^2/4)
+  v_cur[ini] = -size_est / (2 * sqrt(3)) + sqrt(size_est^2/12 + beta^2/4)
+  
+  x_cur = u_cur - v_cur
+  
+  # Save iterate if iterates=TRUE
+  if(iterates == TRUE){
+    X[1,] = x_cur
+  }else{ # Else, compute L2 error and Bregman divergence
+    X[1,1] = min(sqrt(sum((x_cur - x_star)^2)), sqrt(sum((x_cur + x_star)^2)))
+    X[1,2] = min(breg(x_star, x_cur, beta), breg(-x_star, x_cur, beta))
+  } 
+  
+  for(t in 2:iteration){
+    # Exponentiated gradient updates
+    r = step * wf_grad(x_cur, A, y)
+    
+    u_cur = u_cur * exp(-r)
+    v_cur = v_cur * exp(r)
+    x_cur = u_cur - v_cur
+    
+    # Save iterate if iterates=TRUE
+    if(iterates == TRUE){
+      X[t,] = x_cur
+    }else{ # Else, compute L2 error and Bregman divergence
+      X[t,1] = min(sqrt(sum((x_cur - x_star)^2)), sqrt(sum((x_cur + x_star)^2)))
+      X[t,2] = min(breg(x_star, x_cur, beta), breg(-x_star, x_cur, beta))
+    } 
+  }
+  
+  return(X)
+}
